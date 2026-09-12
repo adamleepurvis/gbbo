@@ -19,13 +19,14 @@ A fantasy prediction pool for The Great British Bake Off. Each week, players pic
 
 ## One-time setup
 
-### 1. Create a Supabase project
+### 1. Set up Supabase
 
-Go to [supabase.com/dashboard](https://supabase.com/dashboard) → New Project. Once it's created:
+This app lives in its own `bakeoff` Postgres schema inside an existing Supabase project (Supabase caps free projects per account, so we reuse one instead of creating a new one — the schema keeps everything fully isolated from whatever else is in that project).
 
-1. Go to **SQL Editor** → paste in the contents of [`supabase/schema.sql`](./supabase/schema.sql) → Run.
-2. Go to **Authentication → Providers → Email** and turn **off** "Confirm email" (this is a small private pool — instant sign-up is friendlier than waiting on confirmation emails). Leave it on if you'd rather require verified emails.
-3. Go to **Project Settings → API** and copy the **Project URL** and **anon public key**.
+1. Open the project's dashboard → **SQL Editor** → paste in the contents of [`supabase/schema.sql`](./supabase/schema.sql) → Run. This creates the `bakeoff` schema, all tables, RLS policies, and grants.
+2. Go to **Project Settings → API → Data API** and add `bakeoff` to **Exposed schemas** (it lists `public, graphql_public` by default — add `bakeoff` alongside them). Without this, the API can't see any of the tables.
+3. Go to **Authentication → Providers → Email** and turn **off** "Confirm email" (this is a small private pool — instant sign-up is friendlier than waiting on confirmation emails). Leave it on if you'd rather require verified emails.
+4. Go to **Project Settings → API** and copy the **Project URL** and **anon public key**.
 
 ### 2. Configure the app
 
@@ -47,7 +48,7 @@ npm run dev
 Sign up once through the app's login screen with your own email, then back in the Supabase SQL Editor run:
 
 ```sql
-update profiles set is_admin = true where email = 'you@example.com';
+update bakeoff.profiles set is_admin = true where email = 'you@example.com';
 ```
 
 You'll now see an **Admin** tab in the nav.
