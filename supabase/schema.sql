@@ -79,21 +79,26 @@ create table bakeoff.weeks (
 -- ============================================================
 -- PICKS  (one row per user per week)
 -- ============================================================
+-- handshake_contestant_ids / eliminated_ids are arrays: a player can pick
+-- more than one baker for a suspected double handshake/elimination week.
+-- Scoring (see array_match_score below) rewards +1 per correct pick but
+-- only penalizes wrong guesses beyond the first, so a single wrong pick
+-- still costs nothing -- multi-picking is a real bet, not a free hedge.
 create table bakeoff.picks (
   id uuid primary key default gen_random_uuid(),
   week_id uuid not null references bakeoff.weeks(id) on delete cascade,
   user_id uuid not null references auth.users(id) on delete cascade,
   handshake_guess boolean not null,
-  handshake_contestant_id uuid references bakeoff.contestants(id),
+  handshake_contestant_ids uuid[] not null default '{}',
   technical_first_id uuid not null references bakeoff.contestants(id),
   technical_last_id uuid not null references bakeoff.contestants(id),
   star_baker_id uuid not null references bakeoff.contestants(id),
-  eliminated_id uuid not null references bakeoff.contestants(id),
+  eliminated_ids uuid[] not null default '{}',
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now(),
   unique (week_id, user_id),
   constraint handshake_who_requires_yes check (
-    (handshake_guess = true) or (handshake_contestant_id is null)
+    (handshake_guess = true) or (handshake_contestant_ids = '{}')
   )
 );
 
@@ -140,11 +145,30 @@ create trigger on_results_submitted
   for each row execute procedure bakeoff.apply_results();
 
 -- ============================================================
--- SCORING VIEWS
+-- SCORING
 -- security_invoker ensures these views enforce RLS as the querying
 -- user (anon/authenticated), not as the admin role that created them —
 -- without it, Postgres can silently bypass row security through a view.
 -- ============================================================
+
+-- Scores a multi-pick category: +1 per correct guess, but only wrong
+-- guesses beyond the first cost -1 -- so a single wrong guess is free
+-- (matching a plain single pick), while a reckless multi-guess isn't.
+-- picked=[X] actual=[X,Y] -> 1.  picked=[Z] actual=[X,Y] -> 0.
+-- picked=[X,Y] actual=[X,Y] -> 2.  picked=[X,Z] actual=[X,Y] -> 1.
+-- picked=[Z,W] actual=[X,Y] -> -1.
+create function bakeoff.array_match_score(picked uuid[], actual uuid[])
+returns int
+language sql immutable
+as $$
+  with m as (
+    select count(*)::int as matches
+    from unnest(coalesce(picked, '{}'::uuid[])) x
+    where x = any(coalesce(actual, '{}'::uuid[]))
+  )
+  select m.matches - greatest(0, coalesce(array_length(picked, 1), 0) - m.matches - 1)
+  from m
+$$;
 
 -- per-pick, per-week score breakdown
 create view bakeoff.week_scores
@@ -159,21 +183,21 @@ select
   (case when p.handshake_guess = r.handshake_occurred then 1 else -1 end)
     as handshake_yn_points,
   (case when r.handshake_occurred and p.handshake_guess
-        and p.handshake_contestant_id = any(r.handshake_contestant_ids)
-        then 1 else 0 end) as handshake_who_points,
+        then bakeoff.array_match_score(p.handshake_contestant_ids, r.handshake_contestant_ids)
+        else 0 end) as handshake_who_points,
   (case when p.technical_first_id = r.technical_first_id then 1 else 0 end) as first_points,
   (case when p.technical_last_id = r.technical_last_id then 1 else 0 end) as last_points,
   (case when p.star_baker_id = r.star_baker_id then 1 else 0 end) as star_baker_points,
-  (case when p.eliminated_id = any(r.eliminated_ids) then 1 else 0 end) as eliminated_points,
+  bakeoff.array_match_score(p.eliminated_ids, r.eliminated_ids) as eliminated_points,
   (
     (case when p.handshake_guess = r.handshake_occurred then 1 else -1 end)
     + (case when r.handshake_occurred and p.handshake_guess
-            and p.handshake_contestant_id = any(r.handshake_contestant_ids)
-            then 1 else 0 end)
+            then bakeoff.array_match_score(p.handshake_contestant_ids, r.handshake_contestant_ids)
+            else 0 end)
     + (case when p.technical_first_id = r.technical_first_id then 1 else 0 end)
     + (case when p.technical_last_id = r.technical_last_id then 1 else 0 end)
     + (case when p.star_baker_id = r.star_baker_id then 1 else 0 end)
-    + (case when p.eliminated_id = any(r.eliminated_ids) then 1 else 0 end)
+    + bakeoff.array_match_score(p.eliminated_ids, r.eliminated_ids)
   ) as total_points
 from bakeoff.picks p
 join bakeoff.weeks w on w.id = p.week_id

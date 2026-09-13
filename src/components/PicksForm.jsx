@@ -5,11 +5,15 @@ import ContestantPicker from './ContestantPicker'
 
 const emptyPick = {
   handshake_guess: '',
-  handshake_contestant_id: '',
+  handshake_contestant_ids: [],
   technical_first_id: '',
   technical_last_id: '',
   star_baker_id: '',
-  eliminated_id: '',
+  eliminated_ids: [],
+}
+
+function formatSigned(n) {
+  return n > 0 ? `+${n}` : `${n}`
 }
 
 export default function PicksForm() {
@@ -66,15 +70,15 @@ export default function PicksForm() {
       if (existing) {
         nextDrafts[w.id] = {
           handshake_guess: String(existing.handshake_guess),
-          handshake_contestant_id: existing.handshake_contestant_id ?? '',
+          handshake_contestant_ids: existing.handshake_contestant_ids ?? [],
           technical_first_id: existing.technical_first_id,
           technical_last_id: existing.technical_last_id,
           star_baker_id: existing.star_baker_id,
-          eliminated_id: existing.eliminated_id,
+          eliminated_ids: existing.eliminated_ids ?? [],
         }
         saved.add(w.id)
       } else {
-        nextDrafts[w.id] = { ...emptyPick }
+        nextDrafts[w.id] = { ...emptyPick, handshake_contestant_ids: [], eliminated_ids: [] }
       }
     }
     setDrafts(nextDrafts)
@@ -88,15 +92,15 @@ export default function PicksForm() {
       [weekId]: {
         ...prev[weekId],
         [field]: value,
-        ...(field === 'handshake_guess' && value !== 'true' ? { handshake_contestant_id: '' } : {}),
+        ...(field === 'handshake_guess' && value !== 'true' ? { handshake_contestant_ids: [] } : {}),
       },
     }))
   }
 
   function isComplete(draft) {
     if (draft.handshake_guess === '') return false
-    if (draft.handshake_guess === 'true' && !draft.handshake_contestant_id) return false
-    return draft.technical_first_id && draft.technical_last_id && draft.star_baker_id && draft.eliminated_id
+    if (draft.handshake_guess === 'true' && draft.handshake_contestant_ids.length === 0) return false
+    return draft.technical_first_id && draft.technical_last_id && draft.star_baker_id && draft.eliminated_ids.length > 0
   }
 
   async function handleSubmit(weekId, e) {
@@ -110,11 +114,11 @@ export default function PicksForm() {
       week_id: weekId,
       user_id: user.id,
       handshake_guess: draft.handshake_guess === 'true',
-      handshake_contestant_id: draft.handshake_guess === 'true' ? draft.handshake_contestant_id : null,
+      handshake_contestant_ids: draft.handshake_guess === 'true' ? draft.handshake_contestant_ids : [],
       technical_first_id: draft.technical_first_id,
       technical_last_id: draft.technical_last_id,
       star_baker_id: draft.star_baker_id,
-      eliminated_id: draft.eliminated_id,
+      eliminated_ids: draft.eliminated_ids,
       updated_at: new Date().toISOString(),
     }
 
@@ -130,6 +134,11 @@ export default function PicksForm() {
 
   function contestantName(id) {
     return contestants.find((c) => c.id === id)?.name ?? '—'
+  }
+
+  function contestantNames(ids) {
+    if (!ids || ids.length === 0) return '—'
+    return ids.map(contestantName).join(', ')
   }
 
   if (loading) return <div className="page"><p>Loading…</p></div>
@@ -189,11 +198,12 @@ export default function PicksForm() {
 
             {draft.handshake_guess === 'true' && (
               <div>
-                <span className="picker-label">Who gets the handshake?</span>
+                <span className="picker-label">Who gets the handshake? (tap more than one if you think it's a double)</span>
                 <ContestantPicker
                   contestants={activeContestants}
-                  value={draft.handshake_contestant_id}
-                  onChange={(id) => updateDraft(week.id, 'handshake_contestant_id', id)}
+                  value={draft.handshake_contestant_ids}
+                  onChange={(ids) => updateDraft(week.id, 'handshake_contestant_ids', ids)}
+                  multiple
                 />
               </div>
             )}
@@ -226,11 +236,12 @@ export default function PicksForm() {
             </div>
 
             <div>
-              <span className="picker-label">Eliminated</span>
+              <span className="picker-label">Eliminated (tap more than one if you think it's a double)</span>
               <ContestantPicker
                 contestants={activeContestants}
-                value={draft.eliminated_id}
-                onChange={(id) => updateDraft(week.id, 'eliminated_id', id)}
+                value={draft.eliminated_ids}
+                onChange={(ids) => updateDraft(week.id, 'eliminated_ids', ids)}
+                multiple
               />
             </div>
 
@@ -252,11 +263,11 @@ export default function PicksForm() {
             </div>
             {pick ? (
               <ul className="pick-summary">
-                <li>Handshake: <strong>{pick.handshake_guess ? 'Yes' : 'No'}</strong>{pick.handshake_guess && ` — ${contestantName(pick.handshake_contestant_id)}`}</li>
+                <li>Handshake: <strong>{pick.handshake_guess ? 'Yes' : 'No'}</strong>{pick.handshake_guess && ` — ${contestantNames(pick.handshake_contestant_ids)}`}</li>
                 <li>First: <strong>{contestantName(pick.technical_first_id)}</strong></li>
                 <li>Last: <strong>{contestantName(pick.technical_last_id)}</strong></li>
                 <li>Star Baker: <strong>{contestantName(pick.star_baker_id)}</strong></li>
-                <li>Eliminated: <strong>{contestantName(pick.eliminated_id)}</strong></li>
+                <li>Eliminated: <strong>{contestantNames(pick.eliminated_ids)}</strong></li>
               </ul>
             ) : (
               <p className="hint">You didn't submit a pick this week.</p>
@@ -276,16 +287,16 @@ export default function PicksForm() {
                 <div className="pick-card-header">
                   <h2>Week {week.week_number}{week.label ? ` — ${week.label}` : ''}</h2>
                   <span className={score && score.total_points < 0 ? 'badge badge-negative' : 'badge badge-saved'}>
-                    {score ? `${score.total_points} pts` : 'no pick'}
+                    {score ? `${formatSigned(score.total_points)} pts` : 'no pick'}
                   </span>
                 </div>
                 {pick && score ? (
                   <ul className="pick-summary">
-                    <li>Handshake: <strong>{pick.handshake_guess ? 'Yes' : 'No'}</strong>{pick.handshake_guess && ` — ${contestantName(pick.handshake_contestant_id)}`} ({score.handshake_yn_points + score.handshake_who_points >= 0 ? '+' : ''}{score.handshake_yn_points + score.handshake_who_points})</li>
-                    <li>First: <strong>{contestantName(pick.technical_first_id)}</strong> ({score.first_points > 0 ? '+1' : '0'})</li>
-                    <li>Last: <strong>{contestantName(pick.technical_last_id)}</strong> ({score.last_points > 0 ? '+1' : '0'})</li>
-                    <li>Star Baker: <strong>{contestantName(pick.star_baker_id)}</strong> ({score.star_baker_points > 0 ? '+1' : '0'})</li>
-                    <li>Eliminated: <strong>{contestantName(pick.eliminated_id)}</strong> ({score.eliminated_points > 0 ? '+1' : '0'})</li>
+                    <li>Handshake: <strong>{pick.handshake_guess ? 'Yes' : 'No'}</strong>{pick.handshake_guess && ` — ${contestantNames(pick.handshake_contestant_ids)}`} ({formatSigned(score.handshake_yn_points + score.handshake_who_points)})</li>
+                    <li>First: <strong>{contestantName(pick.technical_first_id)}</strong> ({formatSigned(score.first_points)})</li>
+                    <li>Last: <strong>{contestantName(pick.technical_last_id)}</strong> ({formatSigned(score.last_points)})</li>
+                    <li>Star Baker: <strong>{contestantName(pick.star_baker_id)}</strong> ({formatSigned(score.star_baker_points)})</li>
+                    <li>Eliminated: <strong>{contestantNames(pick.eliminated_ids)}</strong> ({formatSigned(score.eliminated_points)})</li>
                   </ul>
                 ) : (
                   <p className="hint">You didn't submit a pick this week — 0 points.</p>

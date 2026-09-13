@@ -113,19 +113,26 @@ export default function Home() {
         </p>
         <ul className="rules-list">
           <li>Will there be a <strong>Hollywood Handshake</strong>? (Yes / No)</li>
-          <li>If yes — <strong>who</strong> gets it?</li>
+          <li>If yes — <strong>who</strong> gets it? (you can pick more than one if you suspect a double)</li>
           <li><strong>First</strong> in the Technical Challenge</li>
           <li><strong>Last</strong> in the Technical Challenge</li>
           <li><strong>Star Baker</strong></li>
-          <li>Who's <strong>eliminated</strong></li>
+          <li>Who's <strong>eliminated</strong> (again, pick more than one for a suspected double elimination)</li>
         </ul>
         <p>Once the admin submits the real results, your week is scored:</p>
         <ul className="rules-list">
           <li><strong>+1</strong> for each correct pick — first, last, star baker, eliminated</li>
           <li><strong>Handshake Yes/No:</strong> +1 if you call it right, <strong>&minus;1</strong> if you don't</li>
-          <li><strong>Handshake Who:</strong> an extra +1, but only if you guessed "Yes" <em>and</em> named the right baker — guessing "No" skips this pick entirely (no bonus, no penalty)</li>
+          <li><strong>Handshake Who:</strong> only scores if you guessed "Yes" <em>and</em> got the yes/no right — guessing "No" skips this pick entirely (no bonus, no penalty)</li>
+          <li><strong>Eliminated:</strong> always scored, regardless of the handshake</li>
+          <li>
+            <strong>Picking more than one baker</strong> for handshake-who or eliminated is a real bet, not a free hedge:
+            your <em>first</em> wrong guess is always free (same as picking just one), but every wrong guess after that
+            costs <strong>&minus;1</strong>. Pick 2, both right: <strong>+2</strong>. Pick 2, one right one wrong: <strong>+1</strong>
+            (the miss is free). Pick 2, both wrong: <strong>&minus;1</strong>.
+          </li>
         </ul>
-        <p className="hint">Max 6 points in a handshake week, 5 points in a no-handshake week.</p>
+        <p className="hint">Max 6 points in a single-handshake week, 5 in a no-handshake week — more if you correctly call a double.</p>
       </section>
 
       <section className="home-section">
