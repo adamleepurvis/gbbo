@@ -17,6 +17,7 @@ create table bakeoff.profiles (
   id uuid primary key references auth.users(id) on delete cascade,
   email text not null,
   display_name text not null,
+  avatar_url text,
   is_admin boolean not null default false,
   created_at timestamptz not null default now()
 );
@@ -56,6 +57,7 @@ create table bakeoff.contestants (
   id uuid primary key default gen_random_uuid(),
   season_id uuid not null references bakeoff.seasons(id) on delete cascade,
   name text not null,
+  photo_url text,
   is_active boolean not null default true,
   created_at timestamptz not null default now()
 );
@@ -251,6 +253,13 @@ alter default privileges in schema bakeoff
 alter default privileges in schema bakeoff
   grant select on tables to anon;
 
+-- profiles is more sensitive than the rest: RLS's "self update" policy only
+-- checks *which row* (auth.uid() = id), not *which column* — without this,
+-- the blanket UPDATE grant above would let any signed-in user set their own
+-- is_admin to true via a raw API call. Restrict the column list instead.
+revoke update on bakeoff.profiles from authenticated;
+grant update (display_name, avatar_url) on bakeoff.profiles to authenticated;
+
 grant execute on all functions in schema bakeoff to anon, authenticated;
 alter default privileges in schema bakeoff
   grant execute on functions to anon, authenticated;
@@ -262,6 +271,39 @@ alter publication supabase_realtime add table bakeoff.weeks;
 alter publication supabase_realtime add table bakeoff.results;
 alter publication supabase_realtime add table bakeoff.picks;
 alter publication supabase_realtime add table bakeoff.contestants;
+
+-- ============================================================
+-- STORAGE (player-uploaded avatar photos)
+-- Public bucket so avatars display for everyone; writes are restricted
+-- to each user's own folder (avatars/{user_id}/...).
+-- ============================================================
+insert into storage.buckets (id, name, public)
+values ('avatars', 'avatars', true)
+on conflict (id) do nothing;
+
+create policy "avatar owner insert"
+  on storage.objects for insert to authenticated
+  with check (bucket_id = 'avatars' and (storage.foldername(name))[1] = auth.uid()::text);
+
+create policy "avatar owner update"
+  on storage.objects for update to authenticated
+  using (bucket_id = 'avatars' and (storage.foldername(name))[1] = auth.uid()::text)
+  with check (bucket_id = 'avatars' and (storage.foldername(name))[1] = auth.uid()::text);
+
+create policy "avatar owner delete"
+  on storage.objects for delete to authenticated
+  using (bucket_id = 'avatars' and (storage.foldername(name))[1] = auth.uid()::text);
+
+-- Contestant photos: admin-uploaded (sourced by the admin themselves, not
+-- fetched by this app), public bucket so they display for everyone.
+insert into storage.buckets (id, name, public)
+values ('contestant-photos', 'contestant-photos', true)
+on conflict (id) do nothing;
+
+create policy "contestant photos admin write"
+  on storage.objects for all to authenticated
+  using (bucket_id = 'contestant-photos' and bakeoff.is_admin())
+  with check (bucket_id = 'contestant-photos' and bakeoff.is_admin());
 
 -- ============================================================
 -- MAKE YOURSELF ADMIN

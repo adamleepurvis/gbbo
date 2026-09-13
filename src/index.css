@@ -350,6 +350,36 @@ h1, h2, h3 {
   color: var(--blue);
 }
 
+.avatar-photo {
+  border-radius: 50%;
+  object-fit: cover;
+}
+
+.avatar-wrap {
+  position: relative;
+  display: inline-flex;
+}
+
+.avatar-wrap-editable {
+  cursor: pointer;
+}
+
+.avatar-edit-badge {
+  position: absolute;
+  bottom: -2px;
+  right: -2px;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: var(--accent);
+  color: white;
+  font-size: 0.7rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 2px solid var(--bg-card);
+}
+
 .baker-card .baker-name, .player-card .baker-name {
   font-weight: 600;
   font-size: 0.88rem;
@@ -567,6 +597,11 @@ td.neg { color: var(--danger); font-weight: 600; }
 }
 
 .admin-list-item span:first-child {
+  flex: 1;
+  font-weight: 600;
+}
+
+.admin-list-item .flex-name {
   flex: 1;
   font-weight: 600;
 }

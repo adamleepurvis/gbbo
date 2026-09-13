@@ -1,10 +1,16 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { supabase } from '../../lib/supabase'
+import Avatar from '../Avatar'
+
+const MAX_PHOTO_BYTES = 3 * 1024 * 1024
 
 export default function ContestantManager({ season }) {
   const [contestants, setContestants] = useState([])
   const [name, setName] = useState('')
   const [error, setError] = useState('')
+  const [uploadingId, setUploadingId] = useState(null)
+  const pendingContestantId = useRef(null)
+  const fileInputRef = useRef(null)
 
   useEffect(() => {
     load()
@@ -38,6 +44,55 @@ export default function ContestantManager({ season }) {
     else load()
   }
 
+  function triggerPhotoUpload(contestantId) {
+    pendingContestantId.current = contestantId
+    fileInputRef.current?.click()
+  }
+
+  async function handlePhotoChange(e) {
+    const file = e.target.files?.[0]
+    const contestantId = pendingContestantId.current
+    e.target.value = ''
+    if (!file || !contestantId) return
+
+    if (!file.type.startsWith('image/')) {
+      setError('Please choose an image file.')
+      return
+    }
+    if (file.size > MAX_PHOTO_BYTES) {
+      setError('Image is too large (max 3MB).')
+      return
+    }
+
+    setError('')
+    setUploadingId(contestantId)
+
+    const ext = file.name.split('.').pop() || 'jpg'
+    const path = `${contestantId}/photo.${ext}`
+
+    const { error: uploadErr } = await supabase.storage
+      .from('contestant-photos')
+      .upload(path, file, { upsert: true, cacheControl: '3600' })
+
+    if (uploadErr) {
+      setError(uploadErr.message)
+      setUploadingId(null)
+      return
+    }
+
+    const { data: publicUrlData } = supabase.storage.from('contestant-photos').getPublicUrl(path)
+    const photoUrl = `${publicUrlData.publicUrl}?t=${Date.now()}`
+
+    const { error: updateErr } = await supabase
+      .from('contestants')
+      .update({ photo_url: photoUrl })
+      .eq('id', contestantId)
+
+    if (updateErr) setError(updateErr.message)
+    else await load()
+    setUploadingId(null)
+  }
+
   return (
     <div>
       <form className="inline-form" onSubmit={addContestant}>
@@ -55,7 +110,15 @@ export default function ContestantManager({ season }) {
       <ul className="admin-list">
         {contestants.map((c) => (
           <li key={c.id} className="admin-list-item">
-            <span className={c.is_active ? '' : 'strikethrough'}>{c.name}</span>
+            <div
+              className="avatar-wrap avatar-wrap-editable"
+              onClick={() => triggerPhotoUpload(c.id)}
+              title="Upload a photo"
+            >
+              <Avatar name={c.name} photoUrl={c.photo_url} size={36} />
+              <span className="avatar-edit-badge">{uploadingId === c.id ? '…' : '✎'}</span>
+            </div>
+            <span className={c.is_active ? 'flex-name' : 'flex-name strikethrough'}>{c.name}</span>
             <button className="btn btn-ghost" onClick={() => toggleActive(c)}>
               {c.is_active ? 'Mark Eliminated' : 'Mark Active'}
             </button>
@@ -63,6 +126,15 @@ export default function ContestantManager({ season }) {
         ))}
         {contestants.length === 0 && <p className="empty-state">No bakers yet for {season.name} — add one above.</p>}
       </ul>
+
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept="image/*"
+        style={{ display: 'none' }}
+        onChange={handlePhotoChange}
+      />
+      <p className="hint">Click a baker's avatar to upload their photo.</p>
     </div>
   )
 }

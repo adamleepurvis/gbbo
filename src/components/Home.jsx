@@ -1,20 +1,19 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { supabase } from '../lib/supabase'
+import { useAuth } from '../context/AuthContext'
+import Avatar from './Avatar'
 
-function initials(name) {
-  return name
-    .split(' ')
-    .map((part) => part[0])
-    .join('')
-    .slice(0, 2)
-    .toUpperCase()
-}
+const MAX_AVATAR_BYTES = 3 * 1024 * 1024
 
 export default function Home() {
+  const { user } = useAuth()
   const [loading, setLoading] = useState(true)
   const [season, setSeason] = useState(null)
   const [contestants, setContestants] = useState([])
   const [players, setPlayers] = useState([])
+  const [uploading, setUploading] = useState(false)
+  const [uploadError, setUploadError] = useState('')
+  const fileInputRef = useRef(null)
 
   useEffect(() => {
     load()
@@ -41,6 +40,52 @@ export default function Home() {
     setContestants(cons ?? [])
     setPlayers(profiles ?? [])
     setLoading(false)
+  }
+
+  async function handleAvatarChange(e) {
+    const file = e.target.files?.[0]
+    e.target.value = ''
+    if (!file) return
+
+    if (!file.type.startsWith('image/')) {
+      setUploadError('Please choose an image file.')
+      return
+    }
+    if (file.size > MAX_AVATAR_BYTES) {
+      setUploadError('Image is too large (max 3MB).')
+      return
+    }
+
+    setUploading(true)
+    setUploadError('')
+
+    const ext = file.name.split('.').pop() || 'jpg'
+    const path = `${user.id}/avatar.${ext}`
+
+    const { error: uploadErr } = await supabase.storage
+      .from('avatars')
+      .upload(path, file, { upsert: true, cacheControl: '3600' })
+
+    if (uploadErr) {
+      setUploadError(uploadErr.message)
+      setUploading(false)
+      return
+    }
+
+    const { data: publicUrlData } = supabase.storage.from('avatars').getPublicUrl(path)
+    const avatarUrl = `${publicUrlData.publicUrl}?t=${Date.now()}`
+
+    const { error: updateErr } = await supabase
+      .from('profiles')
+      .update({ avatar_url: avatarUrl })
+      .eq('id', user.id)
+
+    if (updateErr) {
+      setUploadError(updateErr.message)
+    } else {
+      await load()
+    }
+    setUploading(false)
   }
 
   if (loading) return <div className="page"><p>Loading…</p></div>
@@ -90,7 +135,7 @@ export default function Home() {
           <div className="baker-grid">
             {contestants.map((c) => (
               <div key={c.id} className={c.is_active ? 'baker-card' : 'baker-card eliminated'}>
-                <div className="baker-avatar">{initials(c.name)}</div>
+                <Avatar name={c.name} photoUrl={c.photo_url} size={56} />
                 <span className="baker-name">{c.name}</span>
                 {!c.is_active && <span className="badge badge-status-complete">out</span>}
               </div>
@@ -105,15 +150,34 @@ export default function Home() {
           <p className="empty-state">No one has signed up yet.</p>
         ) : (
           <div className="player-grid">
-            {players.map((p) => (
-              <div key={p.id} className="player-card">
-                <div className="baker-avatar player-avatar">{initials(p.display_name)}</div>
-                <span className="baker-name">{p.display_name}</span>
-                {p.is_admin && <span className="badge badge-saved">admin</span>}
-              </div>
-            ))}
+            {players.map((p) => {
+              const isMe = p.id === user.id
+              return (
+                <div key={p.id} className="player-card">
+                  <div
+                    className={isMe ? 'avatar-wrap avatar-wrap-editable' : 'avatar-wrap'}
+                    onClick={isMe ? () => fileInputRef.current?.click() : undefined}
+                    title={isMe ? 'Change your photo' : undefined}
+                  >
+                    <Avatar name={p.display_name} photoUrl={p.avatar_url} size={56} />
+                    {isMe && <span className="avatar-edit-badge">{uploading ? '…' : '✎'}</span>}
+                  </div>
+                  <span className="baker-name">{p.display_name}</span>
+                  {p.is_admin && <span className="badge badge-saved">admin</span>}
+                </div>
+              )
+            })}
           </div>
         )}
+        <input
+          ref={fileInputRef}
+          type="file"
+          accept="image/*"
+          style={{ display: 'none' }}
+          onChange={handleAvatarChange}
+        />
+        {uploadError && <p className="auth-error">{uploadError}</p>}
+        <p className="hint">Click your own avatar above to upload a photo.</p>
       </section>
     </div>
   )
