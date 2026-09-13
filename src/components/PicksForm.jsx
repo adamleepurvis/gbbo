@@ -16,8 +16,10 @@ export default function PicksForm() {
   const { user } = useAuth()
   const [loading, setLoading] = useState(true)
   const [season, setSeason] = useState(null)
-  const [openWeeks, setOpenWeeks] = useState([])
+  const [weeks, setWeeks] = useState([])
   const [contestants, setContestants] = useState([])
+  const [myPicks, setMyPicks] = useState([])
+  const [myScores, setMyScores] = useState([])
   const [drafts, setDrafts] = useState({}) // week_id -> pick draft
   const [savedWeekIds, setSavedWeekIds] = useState(new Set())
   const [status, setStatus] = useState({}) // week_id -> 'saving' | 'saved' | error string
@@ -44,19 +46,23 @@ export default function PicksForm() {
       return
     }
 
-    const [{ data: weeks }, { data: cons }, { data: myPicks }] = await Promise.all([
-      supabase.from('weeks').select('*').eq('season_id', activeSeason.id).eq('status', 'open').order('week_number'),
-      supabase.from('contestants').select('*').eq('season_id', activeSeason.id).eq('is_active', true).order('name'),
+    const [{ data: wks }, { data: cons }, { data: picks }, { data: scores }] = await Promise.all([
+      supabase.from('weeks').select('*').eq('season_id', activeSeason.id).order('week_number'),
+      supabase.from('contestants').select('*').eq('season_id', activeSeason.id).order('name'),
       supabase.from('picks').select('*').eq('user_id', user.id),
+      supabase.from('week_scores').select('*').eq('user_id', user.id).eq('season_id', activeSeason.id),
     ])
 
-    setOpenWeeks(weeks ?? [])
+    const openWeeks = (wks ?? []).filter((w) => w.status === 'open')
+    setWeeks(wks ?? [])
     setContestants(cons ?? [])
+    setMyPicks(picks ?? [])
+    setMyScores(scores ?? [])
 
     const nextDrafts = {}
     const saved = new Set()
-    for (const w of weeks ?? []) {
-      const existing = (myPicks ?? []).find((p) => p.week_id === w.id)
+    for (const w of openWeeks) {
+      const existing = (picks ?? []).find((p) => p.week_id === w.id)
       if (existing) {
         nextDrafts[w.id] = {
           handshake_guess: String(existing.handshake_guess),
@@ -122,6 +128,10 @@ export default function PicksForm() {
     }
   }
 
+  function contestantName(id) {
+    return contestants.find((c) => c.id === id)?.name ?? '—'
+  }
+
   if (loading) return <div className="page"><p>Loading…</p></div>
 
   if (!season) {
@@ -133,20 +143,19 @@ export default function PicksForm() {
     )
   }
 
-  if (openWeeks.length === 0) {
-    return (
-      <div className="page">
-        <h1>My Picks</h1>
-        <p className="page-subtitle">{season.name}</p>
-        <p className="empty-state">No weeks are open for picks right now. Check back once the admin opens the next week.</p>
-      </div>
-    )
-  }
+  const activeContestants = contestants.filter((c) => c.is_active)
+  const openWeeks = weeks.filter((w) => w.status === 'open')
+  const lockedWeeks = weeks.filter((w) => w.status === 'locked')
+  const completedWeeks = weeks.filter((w) => w.status === 'complete').slice().reverse()
 
   return (
     <div className="page">
       <h1>My Picks</h1>
       <p className="page-subtitle">{season.name}</p>
+
+      {openWeeks.length === 0 && (
+        <p className="empty-state">No weeks are open for picks right now. Check back once the admin opens the next week.</p>
+      )}
 
       {openWeeks.map((week) => {
         const draft = drafts[week.id] ?? emptyPick
@@ -182,7 +191,7 @@ export default function PicksForm() {
               <div>
                 <span className="picker-label">Who gets the handshake?</span>
                 <ContestantPicker
-                  contestants={contestants}
+                  contestants={activeContestants}
                   value={draft.handshake_contestant_id}
                   onChange={(id) => updateDraft(week.id, 'handshake_contestant_id', id)}
                 />
@@ -192,7 +201,7 @@ export default function PicksForm() {
             <div>
               <span className="picker-label">First in Technical</span>
               <ContestantPicker
-                contestants={contestants}
+                contestants={activeContestants}
                 value={draft.technical_first_id}
                 onChange={(id) => updateDraft(week.id, 'technical_first_id', id)}
               />
@@ -201,7 +210,7 @@ export default function PicksForm() {
             <div>
               <span className="picker-label">Last in Technical</span>
               <ContestantPicker
-                contestants={contestants}
+                contestants={activeContestants}
                 value={draft.technical_last_id}
                 onChange={(id) => updateDraft(week.id, 'technical_last_id', id)}
               />
@@ -210,7 +219,7 @@ export default function PicksForm() {
             <div>
               <span className="picker-label">Star Baker</span>
               <ContestantPicker
-                contestants={contestants}
+                contestants={activeContestants}
                 value={draft.star_baker_id}
                 onChange={(id) => updateDraft(week.id, 'star_baker_id', id)}
               />
@@ -219,7 +228,7 @@ export default function PicksForm() {
             <div>
               <span className="picker-label">Eliminated</span>
               <ContestantPicker
-                contestants={contestants}
+                contestants={activeContestants}
                 value={draft.eliminated_id}
                 onChange={(id) => updateDraft(week.id, 'eliminated_id', id)}
               />
@@ -232,6 +241,60 @@ export default function PicksForm() {
           </form>
         )
       })}
+
+      {lockedWeeks.map((week) => {
+        const pick = myPicks.find((p) => p.week_id === week.id)
+        return (
+          <div key={week.id} className="pick-card pick-card-readonly">
+            <div className="pick-card-header">
+              <h2>Week {week.week_number}{week.label ? ` — ${week.label}` : ''}</h2>
+              <span className="badge badge-status-locked">locked — awaiting results</span>
+            </div>
+            {pick ? (
+              <ul className="pick-summary">
+                <li>Handshake: <strong>{pick.handshake_guess ? 'Yes' : 'No'}</strong>{pick.handshake_guess && ` — ${contestantName(pick.handshake_contestant_id)}`}</li>
+                <li>First: <strong>{contestantName(pick.technical_first_id)}</strong></li>
+                <li>Last: <strong>{contestantName(pick.technical_last_id)}</strong></li>
+                <li>Star Baker: <strong>{contestantName(pick.star_baker_id)}</strong></li>
+                <li>Eliminated: <strong>{contestantName(pick.eliminated_id)}</strong></li>
+              </ul>
+            ) : (
+              <p className="hint">You didn't submit a pick this week.</p>
+            )}
+          </div>
+        )
+      })}
+
+      {completedWeeks.length > 0 && (
+        <>
+          <h2 className="history-heading">Past Weeks</h2>
+          {completedWeeks.map((week) => {
+            const pick = myPicks.find((p) => p.week_id === week.id)
+            const score = myScores.find((s) => s.week_id === week.id)
+            return (
+              <div key={week.id} className="pick-card pick-card-readonly">
+                <div className="pick-card-header">
+                  <h2>Week {week.week_number}{week.label ? ` — ${week.label}` : ''}</h2>
+                  <span className={score && score.total_points < 0 ? 'badge badge-negative' : 'badge badge-saved'}>
+                    {score ? `${score.total_points} pts` : 'no pick'}
+                  </span>
+                </div>
+                {pick && score ? (
+                  <ul className="pick-summary">
+                    <li>Handshake: <strong>{pick.handshake_guess ? 'Yes' : 'No'}</strong>{pick.handshake_guess && ` — ${contestantName(pick.handshake_contestant_id)}`} ({score.handshake_yn_points + score.handshake_who_points >= 0 ? '+' : ''}{score.handshake_yn_points + score.handshake_who_points})</li>
+                    <li>First: <strong>{contestantName(pick.technical_first_id)}</strong> ({score.first_points > 0 ? '+1' : '0'})</li>
+                    <li>Last: <strong>{contestantName(pick.technical_last_id)}</strong> ({score.last_points > 0 ? '+1' : '0'})</li>
+                    <li>Star Baker: <strong>{contestantName(pick.star_baker_id)}</strong> ({score.star_baker_points > 0 ? '+1' : '0'})</li>
+                    <li>Eliminated: <strong>{contestantName(pick.eliminated_id)}</strong> ({score.eliminated_points > 0 ? '+1' : '0'})</li>
+                  </ul>
+                ) : (
+                  <p className="hint">You didn't submit a pick this week — 0 points.</p>
+                )}
+              </div>
+            )
+          })}
+        </>
+      )}
     </div>
   )
 }

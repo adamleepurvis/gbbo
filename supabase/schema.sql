@@ -19,6 +19,7 @@ create table bakeoff.profiles (
   display_name text not null,
   avatar_url text,
   is_admin boolean not null default false,
+  email_reminders_enabled boolean not null default true,
   created_at timestamptz not null default now()
 );
 
@@ -99,30 +100,43 @@ create table bakeoff.picks (
 -- ============================================================
 -- RESULTS  (the admin-submitted answer key, one row per week)
 -- ============================================================
+-- handshake_contestant_ids / eliminated_ids are arrays (not a single uuid)
+-- because a real episode can have a double handshake or a double
+-- elimination — a player's single pick still scores if it matches ANY
+-- element of the actual outcome.
 create table bakeoff.results (
   id uuid primary key default gen_random_uuid(),
   week_id uuid not null unique references bakeoff.weeks(id) on delete cascade,
   handshake_occurred boolean not null,
-  handshake_contestant_id uuid references bakeoff.contestants(id),
+  handshake_contestant_ids uuid[] not null default '{}',
   technical_first_id uuid not null references bakeoff.contestants(id),
   technical_last_id uuid not null references bakeoff.contestants(id),
   star_baker_id uuid not null references bakeoff.contestants(id),
-  eliminated_id uuid not null references bakeoff.contestants(id),
+  eliminated_ids uuid[] not null default '{}',
   submitted_at timestamptz not null default now()
 );
 
--- submitting results: mark the week complete + eliminate the contestant
+-- submitting results: mark the week complete + eliminate the contestant(s).
+-- Also handles UPDATE (editing a mistake) by reverting anyone removed from
+-- eliminated_ids back to active and eliminating anyone newly added.
 create function bakeoff.apply_results()
 returns trigger as $$
 begin
-  update bakeoff.weeks set status = 'complete' where id = new.week_id;
-  update bakeoff.contestants set is_active = false where id = new.eliminated_id;
+  if tg_op = 'INSERT' then
+    update bakeoff.weeks set status = 'complete' where id = new.week_id;
+    update bakeoff.contestants set is_active = false where id = any(new.eliminated_ids);
+  elsif tg_op = 'UPDATE' then
+    update bakeoff.contestants set is_active = true
+      where id = any(old.eliminated_ids) and not (id = any(new.eliminated_ids));
+    update bakeoff.contestants set is_active = false
+      where id = any(new.eliminated_ids);
+  end if;
   return new;
 end;
 $$ language plpgsql security definer set search_path = bakeoff, public;
 
 create trigger on_results_submitted
-  after insert on bakeoff.results
+  after insert or update on bakeoff.results
   for each row execute procedure bakeoff.apply_results();
 
 -- ============================================================
@@ -145,21 +159,21 @@ select
   (case when p.handshake_guess = r.handshake_occurred then 1 else -1 end)
     as handshake_yn_points,
   (case when r.handshake_occurred and p.handshake_guess
-        and p.handshake_contestant_id = r.handshake_contestant_id
+        and p.handshake_contestant_id = any(r.handshake_contestant_ids)
         then 1 else 0 end) as handshake_who_points,
   (case when p.technical_first_id = r.technical_first_id then 1 else 0 end) as first_points,
   (case when p.technical_last_id = r.technical_last_id then 1 else 0 end) as last_points,
   (case when p.star_baker_id = r.star_baker_id then 1 else 0 end) as star_baker_points,
-  (case when p.eliminated_id = r.eliminated_id then 1 else 0 end) as eliminated_points,
+  (case when p.eliminated_id = any(r.eliminated_ids) then 1 else 0 end) as eliminated_points,
   (
     (case when p.handshake_guess = r.handshake_occurred then 1 else -1 end)
     + (case when r.handshake_occurred and p.handshake_guess
-            and p.handshake_contestant_id = r.handshake_contestant_id
+            and p.handshake_contestant_id = any(r.handshake_contestant_ids)
             then 1 else 0 end)
     + (case when p.technical_first_id = r.technical_first_id then 1 else 0 end)
     + (case when p.technical_last_id = r.technical_last_id then 1 else 0 end)
     + (case when p.star_baker_id = r.star_baker_id then 1 else 0 end)
-    + (case when p.eliminated_id = r.eliminated_id then 1 else 0 end)
+    + (case when p.eliminated_id = any(r.eliminated_ids) then 1 else 0 end)
   ) as total_points
 from bakeoff.picks p
 join bakeoff.weeks w on w.id = p.week_id
@@ -258,7 +272,7 @@ alter default privileges in schema bakeoff
 -- the blanket UPDATE grant above would let any signed-in user set their own
 -- is_admin to true via a raw API call. Restrict the column list instead.
 revoke update on bakeoff.profiles from authenticated;
-grant update (display_name, avatar_url) on bakeoff.profiles to authenticated;
+grant update (display_name, avatar_url, email_reminders_enabled) on bakeoff.profiles to authenticated;
 
 grant execute on all functions in schema bakeoff to anon, authenticated;
 alter default privileges in schema bakeoff

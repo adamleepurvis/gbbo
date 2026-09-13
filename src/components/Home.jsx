@@ -13,6 +13,7 @@ export default function Home() {
   const [players, setPlayers] = useState([])
   const [uploading, setUploading] = useState(false)
   const [uploadError, setUploadError] = useState('')
+  const [reminderBusy, setReminderBusy] = useState(false)
   const fileInputRef = useRef(null)
 
   useEffect(() => {
@@ -86,6 +87,16 @@ export default function Home() {
       await load()
     }
     setUploading(false)
+  }
+
+  async function toggleReminders(current) {
+    setReminderBusy(true)
+    const { error } = await supabase
+      .from('profiles')
+      .update({ email_reminders_enabled: !current })
+      .eq('id', user.id)
+    if (!error) await load()
+    setReminderBusy(false)
   }
 
   if (loading) return <div className="page"><p>Loading…</p></div>
@@ -178,6 +189,23 @@ export default function Home() {
         />
         {uploadError && <p className="auth-error">{uploadError}</p>}
         <p className="hint">Click your own avatar above to upload a photo.</p>
+
+        {(() => {
+          const me = players.find((p) => p.id === user.id)
+          if (!me) return null
+          return (
+            <label className="reminder-toggle">
+              <input
+                type="checkbox"
+                checked={me.email_reminders_enabled}
+                disabled={reminderBusy}
+                onChange={() => toggleReminders(me.email_reminders_enabled)}
+              />
+              Email me weekly pick reminders
+            </label>
+          )
+        })()}
+        <p className="hint">Reminder emails aren't sent yet — this just saves your preference for when they are.</p>
       </section>
     </div>
   )

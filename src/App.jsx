@@ -1,6 +1,7 @@
 import { Navigate, Route, Routes } from 'react-router-dom'
 import { useAuth } from './context/AuthContext'
 import Login from './components/Login'
+import ResetPassword from './components/ResetPassword'
 import Nav from './components/Nav'
 import Home from './components/Home'
 import Scoreboard from './components/Scoreboard'
@@ -8,10 +9,14 @@ import PicksForm from './components/PicksForm'
 import AdminPage from './components/admin/AdminPage'
 
 function App() {
-  const { user, isAdmin, loading } = useAuth()
+  const { user, isAdmin, loading, passwordRecovery } = useAuth()
 
   if (loading) {
     return <div className="app-loading">Loading…</div>
+  }
+
+  if (passwordRecovery) {
+    return <ResetPassword />
   }
 
   if (!user) {

@@ -1,20 +1,23 @@
 import { useEffect, useState } from 'react'
 import { supabase } from '../../lib/supabase'
+import ContestantPicker from '../ContestantPicker'
 
-const emptyResult = {
+const emptyForm = {
   handshake_occurred: '',
-  handshake_contestant_id: '',
+  handshake_contestant_ids: [],
   technical_first_id: '',
   technical_last_id: '',
   star_baker_id: '',
-  eliminated_id: '',
+  eliminated_ids: [],
 }
 
 export default function ResultsForm({ season }) {
   const [weeks, setWeeks] = useState([])
   const [contestants, setContestants] = useState([])
+  const [resultsByWeek, setResultsByWeek] = useState({})
   const [selectedWeekId, setSelectedWeekId] = useState('')
-  const [form, setForm] = useState(emptyResult)
+  const [isEditing, setIsEditing] = useState(false)
+  const [form, setForm] = useState(emptyForm)
   const [error, setError] = useState('')
   const [success, setSuccess] = useState('')
   const [busy, setBusy] = useState(false)
@@ -24,29 +27,58 @@ export default function ResultsForm({ season }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [season.id])
 
+  useEffect(() => {
+    const week = weeks.find((w) => w.id === selectedWeekId)
+    if (!week) return
+    if (week.status === 'complete' && resultsByWeek[week.id]) {
+      const r = resultsByWeek[week.id]
+      setForm({
+        handshake_occurred: String(r.handshake_occurred),
+        handshake_contestant_ids: r.handshake_contestant_ids ?? [],
+        technical_first_id: r.technical_first_id,
+        technical_last_id: r.technical_last_id,
+        star_baker_id: r.star_baker_id,
+        eliminated_ids: r.eliminated_ids ?? [],
+      })
+      setIsEditing(true)
+    } else {
+      setForm(emptyForm)
+      setIsEditing(false)
+    }
+    setSuccess('')
+    setError('')
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedWeekId])
+
   async function load() {
-    const [{ data: wks }, { data: cons }] = await Promise.all([
+    const [{ data: wks }, { data: cons }, { data: res }] = await Promise.all([
       supabase.from('weeks').select('*').eq('season_id', season.id).order('week_number'),
-      supabase.from('contestants').select('*').eq('season_id', season.id).eq('is_active', true).order('name'),
+      supabase.from('contestants').select('*').eq('season_id', season.id).order('name'),
+      supabase.from('results').select('*, weeks!inner(season_id)').eq('weeks.season_id', season.id),
     ])
     setWeeks(wks ?? [])
     setContestants(cons ?? [])
-    const firstScorable = (wks ?? []).find((w) => w.status !== 'complete')
-    setSelectedWeekId(firstScorable?.id ?? '')
+    const map = {}
+    for (const r of res ?? []) map[r.week_id] = r
+    setResultsByWeek(map)
+    if (!selectedWeekId) {
+      const firstScorable = (wks ?? []).find((w) => w.status !== 'complete')
+      setSelectedWeekId(firstScorable?.id ?? '')
+    }
   }
 
   function update(field, value) {
     setForm((prev) => ({
       ...prev,
       [field]: value,
-      ...(field === 'handshake_occurred' && value !== 'true' ? { handshake_contestant_id: '' } : {}),
+      ...(field === 'handshake_occurred' && value !== 'true' ? { handshake_contestant_ids: [] } : {}),
     }))
   }
 
   function isComplete() {
     if (form.handshake_occurred === '') return false
-    if (form.handshake_occurred === 'true' && !form.handshake_contestant_id) return false
-    return form.technical_first_id && form.technical_last_id && form.star_baker_id && form.eliminated_id
+    if (form.handshake_occurred === 'true' && form.handshake_contestant_ids.length === 0) return false
+    return form.technical_first_id && form.technical_last_id && form.star_baker_id && form.eliminated_ids.length > 0
   }
 
   async function submit(e) {
@@ -56,21 +88,23 @@ export default function ResultsForm({ season }) {
     setError('')
     setSuccess('')
 
-    const { error } = await supabase.from('results').insert({
-      week_id: selectedWeekId,
+    const payload = {
       handshake_occurred: form.handshake_occurred === 'true',
-      handshake_contestant_id: form.handshake_occurred === 'true' ? form.handshake_contestant_id : null,
+      handshake_contestant_ids: form.handshake_occurred === 'true' ? form.handshake_contestant_ids : [],
       technical_first_id: form.technical_first_id,
       technical_last_id: form.technical_last_id,
       star_baker_id: form.star_baker_id,
-      eliminated_id: form.eliminated_id,
-    })
+      eliminated_ids: form.eliminated_ids,
+    }
+
+    const { error } = isEditing
+      ? await supabase.from('results').update(payload).eq('week_id', selectedWeekId)
+      : await supabase.from('results').insert({ week_id: selectedWeekId, ...payload })
 
     if (error) {
       setError(error.message)
     } else {
-      setSuccess('Results submitted — the week is now scored and the eliminated baker is marked out.')
-      setForm(emptyResult)
+      setSuccess(isEditing ? 'Results updated.' : 'Results submitted — the week is now scored and eliminated baker(s) marked out.')
       load()
     }
     setBusy(false)
@@ -79,27 +113,32 @@ export default function ResultsForm({ season }) {
   const scorableWeeks = weeks.filter((w) => w.status !== 'complete')
   const completedWeeks = weeks.filter((w) => w.status === 'complete')
   const selectedWeek = weeks.find((w) => w.id === selectedWeekId)
+  const pickableContestants = isEditing ? contestants : contestants.filter((c) => c.is_active)
 
   return (
     <div>
       <label>
         Week to score
-        <select value={selectedWeekId} onChange={(e) => { setSelectedWeekId(e.target.value); setSuccess('') }}>
+        <select value={selectedWeekId} onChange={(e) => setSelectedWeekId(e.target.value)}>
           <option value="" disabled>Select a week…</option>
           {scorableWeeks.map((w) => (
             <option key={w.id} value={w.id}>Week {w.week_number}{w.label ? ` — ${w.label}` : ''}</option>
           ))}
+          {completedWeeks.map((w) => (
+            <option key={w.id} value={w.id}>Week {w.week_number}{w.label ? ` — ${w.label}` : ''} (edit)</option>
+          ))}
         </select>
       </label>
 
-      {scorableWeeks.length === 0 && (
-        <p className="empty-state">Every week has been scored. Open a new week in the Weeks tab to continue.</p>
+      {scorableWeeks.length === 0 && completedWeeks.length === 0 && (
+        <p className="empty-state">No weeks yet — open one in the Weeks tab first.</p>
       )}
 
       {selectedWeek && (
         <form className="pick-card" onSubmit={submit}>
           <div className="pick-card-header">
             <h2>Week {selectedWeek.week_number}{selectedWeek.label ? ` — ${selectedWeek.label}` : ''}</h2>
+            {isEditing && <span className="badge badge-status-locked">editing</span>}
           </div>
 
           <label>
@@ -112,62 +151,59 @@ export default function ResultsForm({ season }) {
           </label>
 
           {form.handshake_occurred === 'true' && (
-            <label>
-              Who got the handshake?
-              <select value={form.handshake_contestant_id} onChange={(e) => update('handshake_contestant_id', e.target.value)} required>
-                <option value="" disabled>Select a baker…</option>
-                {contestants.map((c) => (
-                  <option key={c.id} value={c.id}>{c.name}</option>
-                ))}
-              </select>
-            </label>
+            <div>
+              <span className="picker-label">Who got the handshake? (tap all that apply)</span>
+              <ContestantPicker
+                contestants={pickableContestants}
+                value={form.handshake_contestant_ids}
+                onChange={(ids) => update('handshake_contestant_ids', ids)}
+                multiple
+              />
+            </div>
           )}
 
-          <label>
-            First in Technical
-            <select value={form.technical_first_id} onChange={(e) => update('technical_first_id', e.target.value)} required>
-              <option value="" disabled>Select a baker…</option>
-              {contestants.map((c) => (
-                <option key={c.id} value={c.id}>{c.name}</option>
-              ))}
-            </select>
-          </label>
+          <div>
+            <span className="picker-label">First in Technical</span>
+            <ContestantPicker
+              contestants={pickableContestants}
+              value={form.technical_first_id}
+              onChange={(id) => update('technical_first_id', id)}
+            />
+          </div>
 
-          <label>
-            Last in Technical
-            <select value={form.technical_last_id} onChange={(e) => update('technical_last_id', e.target.value)} required>
-              <option value="" disabled>Select a baker…</option>
-              {contestants.map((c) => (
-                <option key={c.id} value={c.id}>{c.name}</option>
-              ))}
-            </select>
-          </label>
+          <div>
+            <span className="picker-label">Last in Technical</span>
+            <ContestantPicker
+              contestants={pickableContestants}
+              value={form.technical_last_id}
+              onChange={(id) => update('technical_last_id', id)}
+            />
+          </div>
 
-          <label>
-            Star Baker
-            <select value={form.star_baker_id} onChange={(e) => update('star_baker_id', e.target.value)} required>
-              <option value="" disabled>Select a baker…</option>
-              {contestants.map((c) => (
-                <option key={c.id} value={c.id}>{c.name}</option>
-              ))}
-            </select>
-          </label>
+          <div>
+            <span className="picker-label">Star Baker</span>
+            <ContestantPicker
+              contestants={pickableContestants}
+              value={form.star_baker_id}
+              onChange={(id) => update('star_baker_id', id)}
+            />
+          </div>
 
-          <label>
-            Eliminated
-            <select value={form.eliminated_id} onChange={(e) => update('eliminated_id', e.target.value)} required>
-              <option value="" disabled>Select a baker…</option>
-              {contestants.map((c) => (
-                <option key={c.id} value={c.id}>{c.name}</option>
-              ))}
-            </select>
-          </label>
+          <div>
+            <span className="picker-label">Eliminated (tap all that apply)</span>
+            <ContestantPicker
+              contestants={pickableContestants}
+              value={form.eliminated_ids}
+              onChange={(ids) => update('eliminated_ids', ids)}
+              multiple
+            />
+          </div>
 
           {error && <p className="auth-error">{error}</p>}
           {success && <p className="auth-info">{success}</p>}
 
           <button type="submit" className="btn btn-primary" disabled={!isComplete() || busy}>
-            {busy ? 'Submitting…' : 'Submit Results & Score Week'}
+            {busy ? 'Saving…' : isEditing ? 'Update Results' : 'Submit Results & Score Week'}
           </button>
         </form>
       )}
@@ -178,8 +214,9 @@ export default function ResultsForm({ season }) {
           <ul className="admin-list">
             {completedWeeks.map((w) => (
               <li key={w.id} className="admin-list-item">
-                <span>Week {w.week_number}{w.label ? ` — ${w.label}` : ''}</span>
+                <span className="flex-name">Week {w.week_number}{w.label ? ` — ${w.label}` : ''}</span>
                 <span className="badge badge-status-complete">complete</span>
+                <button className="btn btn-ghost" onClick={() => setSelectedWeekId(w.id)}>Edit</button>
               </li>
             ))}
           </ul>
