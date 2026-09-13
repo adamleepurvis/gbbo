@@ -27,7 +27,7 @@ export default function ResultsForm({ season }) {
   async function load() {
     const [{ data: wks }, { data: cons }] = await Promise.all([
       supabase.from('weeks').select('*').eq('season_id', season.id).order('week_number'),
-      supabase.from('contestants').select('*').eq('season_id', season.id).order('name'),
+      supabase.from('contestants').select('*').eq('season_id', season.id).eq('is_active', true).order('name'),
     ])
     setWeeks(wks ?? [])
     setContestants(cons ?? [])
