@@ -135,7 +135,7 @@ export default function Home() {
           <div className="baker-grid">
             {contestants.map((c) => (
               <div key={c.id} className={c.is_active ? 'baker-card' : 'baker-card eliminated'}>
-                <Avatar name={c.name} photoUrl={c.photo_url} size={56} />
+                <Avatar name={c.name} photoUrl={c.photo_url} size={96} />
                 <span className="baker-name">{c.name}</span>
                 {!c.is_active && <span className="badge badge-status-complete">out</span>}
               </div>
@@ -159,7 +159,7 @@ export default function Home() {
                     onClick={isMe ? () => fileInputRef.current?.click() : undefined}
                     title={isMe ? 'Change your photo' : undefined}
                   >
-                    <Avatar name={p.display_name} photoUrl={p.avatar_url} size={56} />
+                    <Avatar name={p.display_name} photoUrl={p.avatar_url} size={96} />
                     {isMe && <span className="avatar-edit-badge">{uploading ? '…' : '✎'}</span>}
                   </div>
                   <span className="baker-name">{p.display_name}</span>

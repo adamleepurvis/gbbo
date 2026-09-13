@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../context/AuthContext'
+import ContestantPicker from './ContestantPicker'
 
 const emptyPick = {
   handshake_guess: '',
@@ -171,76 +172,51 @@ export default function PicksForm() {
             </label>
 
             {draft.handshake_guess === 'true' && (
-              <label>
-                Who gets the handshake?
-                <select
+              <div>
+                <span className="picker-label">Who gets the handshake?</span>
+                <ContestantPicker
+                  contestants={contestants}
                   value={draft.handshake_contestant_id}
-                  onChange={(e) => updateDraft(week.id, 'handshake_contestant_id', e.target.value)}
-                  required
-                >
-                  <option value="" disabled>Select a baker…</option>
-                  {contestants.map((c) => (
-                    <option key={c.id} value={c.id}>{c.name}</option>
-                  ))}
-                </select>
-              </label>
+                  onChange={(id) => updateDraft(week.id, 'handshake_contestant_id', id)}
+                />
+              </div>
             )}
 
-            <label>
-              First in Technical
-              <select
+            <div>
+              <span className="picker-label">First in Technical</span>
+              <ContestantPicker
+                contestants={contestants}
                 value={draft.technical_first_id}
-                onChange={(e) => updateDraft(week.id, 'technical_first_id', e.target.value)}
-                required
-              >
-                <option value="" disabled>Select a baker…</option>
-                {contestants.map((c) => (
-                  <option key={c.id} value={c.id}>{c.name}</option>
-                ))}
-              </select>
-            </label>
+                onChange={(id) => updateDraft(week.id, 'technical_first_id', id)}
+              />
+            </div>
 
-            <label>
-              Last in Technical
-              <select
+            <div>
+              <span className="picker-label">Last in Technical</span>
+              <ContestantPicker
+                contestants={contestants}
                 value={draft.technical_last_id}
-                onChange={(e) => updateDraft(week.id, 'technical_last_id', e.target.value)}
-                required
-              >
-                <option value="" disabled>Select a baker…</option>
-                {contestants.map((c) => (
-                  <option key={c.id} value={c.id}>{c.name}</option>
-                ))}
-              </select>
-            </label>
+                onChange={(id) => updateDraft(week.id, 'technical_last_id', id)}
+              />
+            </div>
 
-            <label>
-              Star Baker
-              <select
+            <div>
+              <span className="picker-label">Star Baker</span>
+              <ContestantPicker
+                contestants={contestants}
                 value={draft.star_baker_id}
-                onChange={(e) => updateDraft(week.id, 'star_baker_id', e.target.value)}
-                required
-              >
-                <option value="" disabled>Select a baker…</option>
-                {contestants.map((c) => (
-                  <option key={c.id} value={c.id}>{c.name}</option>
-                ))}
-              </select>
-            </label>
+                onChange={(id) => updateDraft(week.id, 'star_baker_id', id)}
+              />
+            </div>
 
-            <label>
-              Eliminated
-              <select
+            <div>
+              <span className="picker-label">Eliminated</span>
+              <ContestantPicker
+                contestants={contestants}
                 value={draft.eliminated_id}
-                onChange={(e) => updateDraft(week.id, 'eliminated_id', e.target.value)}
-                required
-              >
-                <option value="" disabled>Select a baker…</option>
-                {contestants.map((c) => (
-                  <option key={c.id} value={c.id}>{c.name}</option>
-                ))}
-              </select>
-            </label>
+                onChange={(id) => updateDraft(week.id, 'eliminated_id', id)}
+              />
+            </div>
 
             <button type="submit" className="btn btn-primary" disabled={!isComplete(draft) || st === 'saving'}>
               {st === 'saving' ? 'Saving…' : savedWeekIds.has(week.id) ? 'Update Picks' : 'Submit Picks'}

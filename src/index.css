@@ -314,8 +314,8 @@ h1, h2, h3 {
 
 .baker-grid, .player-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(110px, 1fr));
-  gap: 16px;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  gap: 20px;
   margin-top: 14px;
 }
 
@@ -329,20 +329,6 @@ h1, h2, h3 {
 
 .baker-card.eliminated {
   opacity: 0.5;
-}
-
-.baker-avatar {
-  width: 56px;
-  height: 56px;
-  border-radius: 50%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-family: var(--font-display);
-  font-weight: 700;
-  font-size: 1.1rem;
-  background: var(--accent-soft);
-  color: var(--accent);
 }
 
 .player-avatar {
@@ -382,7 +368,7 @@ h1, h2, h3 {
 
 .baker-card .baker-name, .player-card .baker-name {
   font-weight: 600;
-  font-size: 0.88rem;
+  font-size: 1rem;
 }
 
 /* ===================== Scoreboard ===================== */
@@ -491,6 +477,51 @@ td.neg { color: var(--danger); font-weight: 600; }
 .pick-card .btn {
   align-self: flex-start;
   margin-top: 4px;
+}
+
+.picker-label {
+  display: block;
+  font-weight: 600;
+  font-size: 0.86rem;
+  color: var(--ink-soft);
+  margin-bottom: 8px;
+}
+
+.contestant-picker {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.contestant-pick {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  width: 76px;
+  padding: 8px 4px;
+  background: none;
+  border: 2px solid transparent;
+  border-radius: 12px;
+  cursor: pointer;
+  font-family: var(--font-body);
+  color: var(--ink);
+}
+
+.contestant-pick:hover {
+  background: var(--bg);
+}
+
+.contestant-pick.selected {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+}
+
+.contestant-pick span {
+  font-size: 0.76rem;
+  font-weight: 600;
+  text-align: center;
+  line-height: 1.2;
 }
 
 .badge {

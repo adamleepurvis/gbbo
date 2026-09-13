@@ -294,6 +294,14 @@ create policy "avatar owner delete"
   on storage.objects for delete to authenticated
   using (bucket_id = 'avatars' and (storage.foldername(name))[1] = auth.uid()::text);
 
+-- Needed for upsert: the storage backend does an authenticated existence
+-- check (a SELECT) before an upsert insert/update, which RLS denies without
+-- this even though the bucket is public (the public flag only bypasses RLS
+-- on the separate unauthenticated GET-by-URL route, not this internal check).
+create policy "avatar public read"
+  on storage.objects for select
+  using (bucket_id = 'avatars');
+
 -- Contestant photos: admin-uploaded (sourced by the admin themselves, not
 -- fetched by this app), public bucket so they display for everyone.
 insert into storage.buckets (id, name, public)
