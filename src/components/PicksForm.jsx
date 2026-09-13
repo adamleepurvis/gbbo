@@ -158,18 +158,25 @@ export default function PicksForm() {
               {savedWeekIds.has(week.id) && st !== 'saving' && <span className="badge badge-saved">Saved</span>}
             </div>
 
-            <label>
-              Will there be a Hollywood Handshake?
-              <select
-                value={draft.handshake_guess}
-                onChange={(e) => updateDraft(week.id, 'handshake_guess', e.target.value)}
-                required
-              >
-                <option value="" disabled>Select…</option>
-                <option value="true">Yes</option>
-                <option value="false">No</option>
-              </select>
-            </label>
+            <div>
+              <span className="picker-label">Will there be a Hollywood Handshake?</span>
+              <div className="yn-picker">
+                <button
+                  type="button"
+                  className={draft.handshake_guess === 'true' ? 'yn-btn selected' : 'yn-btn'}
+                  onClick={() => updateDraft(week.id, 'handshake_guess', draft.handshake_guess === 'true' ? '' : 'true')}
+                >
+                  Yes
+                </button>
+                <button
+                  type="button"
+                  className={draft.handshake_guess === 'false' ? 'yn-btn selected' : 'yn-btn'}
+                  onClick={() => updateDraft(week.id, 'handshake_guess', draft.handshake_guess === 'false' ? '' : 'false')}
+                >
+                  No
+                </button>
+              </div>
+            </div>
 
             {draft.handshake_guess === 'true' && (
               <div>

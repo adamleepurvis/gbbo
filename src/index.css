@@ -524,6 +524,35 @@ td.neg { color: var(--danger); font-weight: 600; }
   line-height: 1.2;
 }
 
+.yn-picker {
+  display: flex;
+  gap: 10px;
+}
+
+.yn-btn {
+  flex: 1;
+  max-width: 140px;
+  padding: 12px 20px;
+  font-family: var(--font-body);
+  font-weight: 700;
+  font-size: 0.95rem;
+  border-radius: 999px;
+  border: 1.5px solid var(--border);
+  background: var(--bg-card);
+  color: var(--ink-soft);
+  cursor: pointer;
+}
+
+.yn-btn:hover {
+  background: var(--bg);
+}
+
+.yn-btn.selected {
+  border-color: var(--accent);
+  background: var(--accent);
+  color: white;
+}
+
 .badge {
   font-size: 0.72rem;
   font-weight: 700;
@@ -657,10 +686,70 @@ td.neg { color: var(--danger); font-weight: 600; }
 @media (max-width: 600px) {
   .nav {
     justify-content: center;
+    padding: 10px 14px;
+    gap: 10px;
   }
   .nav-brand {
     width: 100%;
     text-align: center;
     margin-right: 0;
+    font-size: 1rem;
+  }
+  .nav-links {
+    flex: 1;
+    justify-content: center;
+  }
+  .nav-link {
+    padding: 8px 10px;
+    font-size: 0.82rem;
+  }
+  .nav-name {
+    display: none;
+  }
+
+  .app-main {
+    padding: 16px 14px 48px;
+  }
+
+  h1 {
+    font-size: 1.5rem;
+  }
+
+  .home-section, .pick-card {
+    padding: 16px 16px;
+  }
+
+  .btn {
+    min-height: 44px;
+    padding: 10px 18px;
+  }
+
+  .yn-btn {
+    min-height: 48px;
+    max-width: none;
+  }
+
+  .contestant-pick {
+    width: 84px;
+    min-height: 44px;
+  }
+
+  .baker-grid, .player-grid {
+    grid-template-columns: repeat(auto-fill, minmax(96px, 1fr));
+    gap: 14px;
+  }
+
+  .leaderboard-table th, .leaderboard-table td {
+    padding: 10px 8px;
+    font-size: 0.82rem;
+  }
+
+  .admin-season-picker label {
+    max-width: none;
+  }
+
+  .inline-form input {
+    min-width: 0;
+    width: 100%;
   }
 }
