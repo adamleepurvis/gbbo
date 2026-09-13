@@ -9,6 +9,9 @@ export default function Nav() {
       <div className="nav-brand">🍰 Bake Off Fantasy</div>
       <div className="nav-links">
         <NavLink to="/" end className={({ isActive }) => (isActive ? 'nav-link active' : 'nav-link')}>
+          Home
+        </NavLink>
+        <NavLink to="/scoreboard" className={({ isActive }) => (isActive ? 'nav-link active' : 'nav-link')}>
           Scoreboard
         </NavLink>
         <NavLink to="/picks" className={({ isActive }) => (isActive ? 'nav-link active' : 'nav-link')}>

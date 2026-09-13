@@ -163,19 +163,22 @@ from bakeoff.picks p
 join bakeoff.weeks w on w.id = p.week_id
 join bakeoff.results r on r.week_id = p.week_id;
 
--- season leaderboard
+-- season leaderboard — cross join so every signed-up player appears for
+-- every season even before any weeks are scored (left join, not inner,
+-- on week_scores so a player with zero points still shows a row)
 create view bakeoff.leaderboard
 with (security_invoker = true) as
 select
   pr.id as user_id,
   pr.display_name,
   pr.email,
-  ws.season_id,
+  s.id as season_id,
   coalesce(sum(ws.total_points), 0) as total_points,
   count(ws.pick_id) as weeks_scored
 from bakeoff.profiles pr
-join bakeoff.week_scores ws on ws.user_id = pr.id
-group by pr.id, pr.display_name, pr.email, ws.season_id;
+cross join bakeoff.seasons s
+left join bakeoff.week_scores ws on ws.user_id = pr.id and ws.season_id = s.id
+group by pr.id, pr.display_name, pr.email, s.id;
 
 -- ============================================================
 -- ROW LEVEL SECURITY

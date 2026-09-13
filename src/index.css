@@ -265,6 +265,96 @@ h1, h2, h3 {
   margin: 0;
 }
 
+/* ===================== Home ===================== */
+.home-section {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 24px 26px;
+  margin-bottom: 20px;
+}
+
+.home-section h2 {
+  font-size: 1.2rem;
+}
+
+.section-header-row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.section-header-row h2 {
+  margin: 0;
+}
+
+.external-link {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--accent);
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+.external-link:hover {
+  text-decoration: underline;
+}
+
+.rules-list {
+  margin: 8px 0 16px;
+  padding-left: 20px;
+  line-height: 1.7;
+}
+
+.rules-list li {
+  margin-bottom: 4px;
+}
+
+.baker-grid, .player-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(110px, 1fr));
+  gap: 16px;
+  margin-top: 14px;
+}
+
+.baker-card, .player-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  text-align: center;
+}
+
+.baker-card.eliminated {
+  opacity: 0.5;
+}
+
+.baker-avatar {
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 1.1rem;
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+
+.player-avatar {
+  background: #dde6ef;
+  color: var(--blue);
+}
+
+.baker-card .baker-name, .player-card .baker-name {
+  font-weight: 600;
+  font-size: 0.88rem;
+}
+
 /* ===================== Scoreboard ===================== */
 .table-wrap {
   overflow-x: auto;

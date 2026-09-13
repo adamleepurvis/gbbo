@@ -2,6 +2,7 @@ import { Navigate, Route, Routes } from 'react-router-dom'
 import { useAuth } from './context/AuthContext'
 import Login from './components/Login'
 import Nav from './components/Nav'
+import Home from './components/Home'
 import Scoreboard from './components/Scoreboard'
 import PicksForm from './components/PicksForm'
 import AdminPage from './components/admin/AdminPage'
@@ -22,7 +23,8 @@ function App() {
       <Nav />
       <main className="app-main">
         <Routes>
-          <Route path="/" element={<Scoreboard />} />
+          <Route path="/" element={<Home />} />
+          <Route path="/scoreboard" element={<Scoreboard />} />
           <Route path="/picks" element={<PicksForm />} />
           <Route
             path="/admin"
