@@ -71,3 +71,16 @@ npx vercel --prod
 ```
 
 Set the same two env vars (`VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY`) in the Vercel project's environment variables.
+
+## Email reminders (optional)
+
+A daily cron ([`vercel.json`](./vercel.json), `api/send-reminders.js`) emails anyone who hasn't submitted picks for the currently open week yet, once each per week (tracked in `bakeoff.reminder_log` so it doesn't nag daily). Players opt in/out from a checkbox on the Home page.
+
+To turn it on:
+
+1. Create a free account at [resend.com](https://resend.com) and grab an API key — sending from their shared `onboarding@resend.dev` address works with zero setup (no domain verification needed for a small pool).
+2. In Supabase: **Project Settings → API** → copy the **`service_role`** key (different from the anon key — this one bypasses Row Level Security, so it stays server-side only and is never exposed to the browser).
+3. Generate a random string for `CRON_SECRET` (this stops random internet requests from triggering mass emails — Vercel automatically sends it as a bearer token when it invokes the cron).
+4. Set all three as **server-side** Vercel env vars (no `VITE_` prefix): `RESEND_API_KEY`, `SUPABASE_SERVICE_ROLE_KEY`, `CRON_SECRET`.
+
+Without these three set, the reminder cron silently 401s — everything else in the app works fine regardless.

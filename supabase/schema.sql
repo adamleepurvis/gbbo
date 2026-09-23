@@ -145,6 +145,22 @@ create trigger on_results_submitted
   for each row execute procedure bakeoff.apply_results();
 
 -- ============================================================
+-- REMINDER LOG
+-- Dedupe table for the email reminder cron (api/send-reminders.js) so
+-- each player gets at most one reminder per open week, not one every
+-- time the cron runs. Written only by the server (service role, which
+-- bypasses RLS) -- no policies means anon/authenticated get zero access.
+-- ============================================================
+create table bakeoff.reminder_log (
+  week_id uuid not null references bakeoff.weeks(id) on delete cascade,
+  user_id uuid not null references auth.users(id) on delete cascade,
+  sent_at timestamptz not null default now(),
+  primary key (week_id, user_id)
+);
+
+alter table bakeoff.reminder_log enable row level security;
+
+-- ============================================================
 -- SCORING
 -- security_invoker ensures these views enforce RLS as the querying
 -- user (anon/authenticated), not as the admin role that created them —

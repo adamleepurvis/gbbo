@@ -13,7 +13,8 @@
     "@supabase/supabase-js": "^2.116.0",
     "react": "^19.2.8",
     "react-dom": "^19.2.8",
-    "react-router-dom": "^7.18.3"
+    "react-router-dom": "^7.18.3",
+    "resend": "^6.28.1"
   },
   "devDependencies": {
     "@types/react": "^19.2.18",
