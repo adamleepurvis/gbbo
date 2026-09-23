@@ -3,6 +3,11 @@ import { Resend } from 'resend'
 
 // Vercel Cron hits this on a schedule (see vercel.json). Protected by
 // CRON_SECRET so a random internet request can't trigger a mass email.
+//
+// vercel.json's schedule is UTC with no DST awareness -- "0 14 * * 2" is
+// 10am Eastern while EDT is in effect. Once DST ends (Nov 1, 2026) this
+// will fire at 9am Eastern instead; bump it to "0 15 * * 2" then if the
+// season's still running and the hour matters.
 export default async function handler(req, res) {
   const auth = req.headers.authorization
   if (!process.env.CRON_SECRET || auth !== `Bearer ${process.env.CRON_SECRET}`) {
@@ -46,6 +51,7 @@ export default async function handler(req, res) {
         ${openWeek ? `<p>(Referencing the current open week: Week ${openWeek.week_number}${openWeek.label ? ` — ${openWeek.label}` : ''})</p>` : '<p>(No week is currently open.)</p>'}
         <p><a href="${picksUrl}">Make your picks →</a></p>
       `,
+      text: `This is a test of the pick reminder email.\n\n${openWeek ? `(Referencing the current open week: Week ${openWeek.week_number}${openWeek.label ? ` — ${openWeek.label}` : ''})` : '(No week is currently open.)'}\n\nMake your picks: ${picksUrl}`,
     })
 
     if (sendErr) return res.status(500).json({ error: sendErr.message })
@@ -93,15 +99,18 @@ export default async function handler(req, res) {
     const toRemind = (players ?? []).filter((p) => !alreadyHandled.has(p.id))
 
     for (const player of toRemind) {
+      const weekDesc = `Week ${week.week_number}${week.label ? ` — ${week.label}` : ''}`
       const { error: sendErr } = await resend.emails.send({
         from: 'Bake Off Fantasy <onboarding@resend.dev>',
         to: player.email,
-        subject: `Pick reminder: Week ${week.week_number}${week.label ? ` — ${week.label}` : ''}`,
+        subject: `${weekDesc} picks lock tonight!`,
         html: `
           <p>Hi ${player.display_name},</p>
-          <p>You haven't submitted your picks yet for Week ${week.week_number}${week.label ? ` (${week.label})` : ''}.</p>
+          <p>Quick reminder — your picks for ${weekDesc} lock tonight. Get them in before then so you're on the board this week.</p>
           <p><a href="${picksUrl}">Make your picks →</a></p>
+          <p style="color:#888;font-size:13px;">Don't want these reminders? Turn them off on the Home page in the app.</p>
         `,
+        text: `Hi ${player.display_name},\n\nQuick reminder — your picks for ${weekDesc} lock tonight. Get them in before then so you're on the board this week.\n\nMake your picks: ${picksUrl}\n\nDon't want these reminders? Turn them off on the Home page in the app.`,
       })
 
       if (sendErr) {
