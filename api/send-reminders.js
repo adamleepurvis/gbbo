@@ -19,6 +19,39 @@ export default async function handler(req, res) {
   const host = req.headers['x-forwarded-host'] || req.headers.host
   const picksUrl = `https://${host}/picks`
 
+  // Test mode: ?test_email=you@example.com sends one real email to only
+  // that address, ignoring pick/reminder-log state and never writing to
+  // reminder_log -- safe to run without touching anyone else's data.
+  const url = new URL(req.url, `https://${host}`)
+  const testEmail = url.searchParams.get('test_email')
+  if (testEmail) {
+    const { data: openWeek } = await supabase
+      .from('weeks')
+      .select('week_number, label')
+      .eq('status', 'open')
+      .order('week_number', { ascending: false })
+      .limit(1)
+      .maybeSingle()
+
+    const subject = openWeek
+      ? `[TEST] Pick reminder: Week ${openWeek.week_number}${openWeek.label ? ` — ${openWeek.label}` : ''}`
+      : '[TEST] Bake Off Fantasy reminder'
+
+    const { error: sendErr } = await resend.emails.send({
+      from: 'Bake Off Fantasy <onboarding@resend.dev>',
+      to: testEmail,
+      subject,
+      html: `
+        <p>This is a test of the pick reminder email.</p>
+        ${openWeek ? `<p>(Referencing the current open week: Week ${openWeek.week_number}${openWeek.label ? ` — ${openWeek.label}` : ''})</p>` : '<p>(No week is currently open.)</p>'}
+        <p><a href="${picksUrl}">Make your picks →</a></p>
+      `,
+    })
+
+    if (sendErr) return res.status(500).json({ error: sendErr.message })
+    return res.status(200).json({ sent: 1, test: true, to: testEmail })
+  }
+
   const { data: seasons, error: seasonsErr } = await supabase
     .from('seasons')
     .select('id')
