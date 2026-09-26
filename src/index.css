@@ -735,6 +735,23 @@ td.neg { color: var(--danger); font-weight: 600; }
   cursor: pointer;
 }
 
+.checkbox-label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 6px 0 10px;
+  font-size: 0.86rem;
+  font-weight: 600;
+  color: var(--ink-soft);
+  cursor: pointer;
+}
+
+.checkbox-label input {
+  width: 16px;
+  height: 16px;
+  accent-color: var(--accent);
+}
+
 .reminder-toggle input {
   width: 16px;
   height: 16px;

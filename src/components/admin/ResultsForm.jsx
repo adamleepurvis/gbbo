@@ -9,6 +9,7 @@ const emptyForm = {
   technical_last_id: '',
   star_baker_id: '',
   eliminated_ids: [],
+  no_elimination: false,
 }
 
 export default function ResultsForm({ season }) {
@@ -39,6 +40,7 @@ export default function ResultsForm({ season }) {
         technical_last_id: r.technical_last_id,
         star_baker_id: r.star_baker_id,
         eliminated_ids: r.eliminated_ids ?? [],
+        no_elimination: (r.eliminated_ids ?? []).length === 0,
       })
       setIsEditing(true)
     } else {
@@ -72,13 +74,15 @@ export default function ResultsForm({ season }) {
       ...prev,
       [field]: value,
       ...(field === 'handshake_occurred' && value !== 'true' ? { handshake_contestant_ids: [] } : {}),
+      ...(field === 'no_elimination' && value ? { eliminated_ids: [] } : {}),
     }))
   }
 
   function isComplete() {
     if (form.handshake_occurred === '') return false
     if (form.handshake_occurred === 'true' && form.handshake_contestant_ids.length === 0) return false
-    return form.technical_first_id && form.technical_last_id && form.star_baker_id && form.eliminated_ids.length > 0
+    if (!form.technical_first_id || !form.technical_last_id || !form.star_baker_id) return false
+    return form.no_elimination || form.eliminated_ids.length > 0
   }
 
   async function submit(e) {
@@ -191,12 +195,22 @@ export default function ResultsForm({ season }) {
 
           <div>
             <span className="picker-label">Eliminated (tap all that apply)</span>
-            <ContestantPicker
-              contestants={pickableContestants}
-              value={form.eliminated_ids}
-              onChange={(ids) => update('eliminated_ids', ids)}
-              multiple
-            />
+            <label className="checkbox-label">
+              <input
+                type="checkbox"
+                checked={form.no_elimination}
+                onChange={(e) => update('no_elimination', e.target.checked)}
+              />
+              No one was eliminated this week
+            </label>
+            {!form.no_elimination && (
+              <ContestantPicker
+                contestants={pickableContestants}
+                value={form.eliminated_ids}
+                onChange={(ids) => update('eliminated_ids', ids)}
+                multiple
+              />
+            )}
           </div>
 
           {error && <p className="auth-error">{error}</p>}
