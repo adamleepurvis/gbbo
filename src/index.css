@@ -419,6 +419,20 @@ h1, h2, h3 {
 td.pos { color: var(--success); font-weight: 600; }
 td.neg { color: var(--danger); font-weight: 600; }
 
+.picks-compare-table th, .picks-compare-table td {
+  white-space: normal;
+  min-width: 100px;
+}
+
+.correct-answer-row {
+  background: var(--accent-soft);
+  font-weight: 700;
+}
+
+.correct-answer-row td {
+  color: var(--accent);
+}
+
 .empty-state {
   color: var(--ink-soft);
   background: var(--bg-card);

@@ -272,10 +272,13 @@ create policy "weeks admin write" on bakeoff.weeks for all using (bakeoff.is_adm
 create policy "results readable" on bakeoff.results for select using (auth.role() = 'authenticated');
 create policy "results admin write" on bakeoff.results for all using (bakeoff.is_admin()) with check (bakeoff.is_admin());
 
--- picks: users always see + manage their own; everyone can see picks once the week is complete
-create policy "picks select own or completed week" on bakeoff.picks for select using (
+-- picks: users always see + manage their own; everyone can see everyone's
+-- picks once a week is locked (not just once it's scored) -- once you
+-- can no longer change your own pick, seeing others' stops being a way
+-- to copy them.
+create policy "picks select own or revealed week" on bakeoff.picks for select using (
   auth.uid() = user_id
-  or exists (select 1 from bakeoff.weeks w where w.id = week_id and w.status = 'complete')
+  or exists (select 1 from bakeoff.weeks w where w.id = week_id and w.status in ('locked', 'complete'))
   or bakeoff.is_admin()
 );
 create policy "picks insert own while open" on bakeoff.picks for insert with check (
