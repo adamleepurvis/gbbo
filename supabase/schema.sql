@@ -196,7 +196,7 @@ select
   w.season_id,
   w.week_number,
   w.label as week_label,
-  (case when p.handshake_guess = r.handshake_occurred then 1 else -1 end)
+  (case when p.handshake_guess = r.handshake_occurred then 1 else 0 end)
     as handshake_yn_points,
   (case when r.handshake_occurred and p.handshake_guess
         then bakeoff.array_match_score(p.handshake_contestant_ids, r.handshake_contestant_ids)
@@ -206,7 +206,7 @@ select
   (case when p.star_baker_id = r.star_baker_id then 1 else 0 end) as star_baker_points,
   bakeoff.array_match_score(p.eliminated_ids, r.eliminated_ids) as eliminated_points,
   (
-    (case when p.handshake_guess = r.handshake_occurred then 1 else -1 end)
+    (case when p.handshake_guess = r.handshake_occurred then 1 else 0 end)
     + (case when r.handshake_occurred and p.handshake_guess
             then bakeoff.array_match_score(p.handshake_contestant_ids, r.handshake_contestant_ids)
             else 0 end)
